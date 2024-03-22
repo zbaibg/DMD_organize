@@ -5,6 +5,7 @@ from DMDana.lib.constant import *
 from DMDana.do.config import DMDana_ini_Class
 from DMDana.do import *
 import logging
+from pathlib import Path
 from multiprocessing import Pool
 root_path=os.getcwd()
 
@@ -47,12 +48,12 @@ class folder_analysis(object):
         self.df_one_folder.loc[self.folder_number,'folders']=self.folder_path
         #self.df_one_folder.loc[self.folder_number,'id']=self.folder_number
         try:
-            self.get_save_param_in(self.folder_number, self.df_one_folder)
+            self.get_save_param_in()
         except Exception as e:
             self.Find_Error_and_Save(e,"Fail to resolve param.in at folder %d"%self.folder_number)
             return
         try:
-            self.get_save_energy(self.folder_number, self.df_one_folder)
+            self.get_save_energy()
         except Exception as e:
             self.Find_Error_and_Save(e,"Fail to resolve different energy values at folder %d"%self.folder_number)
             return
@@ -65,6 +66,12 @@ class folder_analysis(object):
             self.DMDana_analysis()
         except Exception as e:
             self.Find_Error_and_Save(e,'DMDana analysis failed at folder %d'%self.folder_number)
+            return
+        try:
+            self.get_DMD_init_folder()
+            self.get_kpoint_number()
+        except Exception as e:
+            self.Find_Error_and_Save(e,'Fail to get DMD_init_folder and kpoint_number at folder %d'%self.folder_number)
             return
         self.Success_and_Save()
         return
@@ -113,26 +120,41 @@ class folder_analysis(object):
         save_database('./%d/database_out_%d.xlsx'%(self.folder_number,self.folder_number),self.df_one_folder)
         return
 
-    def get_save_param_in(self, folder_number, df: pd.DataFrame):
+    def get_save_param_in(self):
         os.chdir(root_path)
         self.DMDparam_value=get_DMD_param(self.folder_path)
-        df.loc[folder_number,list(self.DMDparam_value)]=list(self.DMDparam_value.values())
+        self.df_one_folder.loc[self.folder_number,list(self.DMDparam_value)]=list(self.DMDparam_value.values())
 
-    def get_save_energy(self, folder_number, df: pd.DataFrame):
+    def get_save_energy(self):
         os.chdir(root_path)
         self.EBot_probe_au, self.ETop_probe_au, self.EBot_dm_au, self.ETop_dm_au,\
         self.EBot_eph_au, self.ETop_eph_au ,self.EvMax_au, self.EcMin_au=\
         get_erange(self.folder_path)
-        df.loc[folder_number,\
+        self.df_one_folder.loc[self.folder_number,\
         ["EBot_probe_au", "ETop_probe_au", "EBot_dm_au", "ETop_dm_au",\
         "EBot_eph_au", "ETop_eph_au" ,"EvMax_au", "EcMin_au"]]=\
         [self.EBot_probe_au/eV, self.ETop_probe_au/eV, self.EBot_dm_au/eV, self.ETop_dm_au/eV,\
         self.EBot_eph_au/eV, self.ETop_eph_au/eV ,self.EvMax_au/eV, self.EcMin_au/eV]
 
         self.mu_au,self.temperature_au=get_mu_temperature(self.DMDparam_value,self.folder_path)
-        df.loc[folder_number,\
+        self.df_one_folder.loc[self.folder_number,\
         ["mu_eV","temperature_K"]]=[self.mu_au/eV,self.temperature_au/Kelvin]
-        
+    def get_DMD_init_folder(self):
+        os.chdir(root_path)
+        ldbd_data_path=os.path.abspath('ldbd_data')
+        while(os.path.islink(ldbd_data_path)):
+            ldbd_data_path=os.readlink(self.folder_path+'/ldbd_data')
+        self.DMD_init_folder=os.path.dirname(ldbd_data_path)
+        self.df_one_folder.loc[self.folder_number,'DMD_init_folder']=self.DMD_init_folder
+        return
+    def get_kpoint_number(self):
+        self.Full_k_mesh=read_text_from_file(self.DMD_init_folder+'/lindbladInit.out',marlist=['Effective interpolated k-mesh dimensions']*3,locationlist=[5,6,7],stop_at_first_find=True)
+        self.DFT_k_fold=read_text_from_file(self.DMD_init_folder+'/lindbladInit.out',marlist=['kfold =']*3,locationlist=[3,4,5],stop_at_first_find=True)
+        self.k_number=read_text_from_file(self.DMD_init_folder+'/lindbladInit.out',marlist=['k-points with active states from'],locationlist=[2],stop_at_first_find=True)
+        self.df_one_folder.loc[self.folder_number,'Full_k_mesh']=self.Full_k_mesh
+        self.df_one_folder.loc[self.folder_number,'DFT_k_fold']=self.DFT_k_fold
+        self.df_one_folder.loc[self.folder_number,'k_number']=self.k_number
+        return
 if __name__=="__main__":
     DMD_organize=DMD_organize_class()
     DMD_organize.do()
