@@ -48,23 +48,23 @@ class folder_analysis(object):
         #self.df_one_folder.loc[self.folder_number,'id']=self.folder_number
         try:
             self.get_save_param_in(self.folder_number, self.df_one_folder)
-        except:
-            self.Find_Error_and_Save("Fail to resolve param.in at folder %d"%self.folder_number)
+        except Exception as e:
+            self.Find_Error_and_Save(e,"Fail to resolve param.in at folder %d"%self.folder_number)
             return
         try:
             self.get_save_energy(self.folder_number, self.df_one_folder)
-        except:
-            self.Find_Error_and_Save("Fail to resolve different energy values at folder %d"%self.folder_number)
+        except Exception as e:
+            self.Find_Error_and_Save(e,"Fail to resolve different energy values at folder %d"%self.folder_number)
             return
         try:
             self.setup_DMDana_ini()
-        except:
-            self.Find_Error_and_Save("Fail to setup DMDana_ini module for folder %d"%self.folder_number)
+        except Exception as e:
+            self.Find_Error_and_Save(e,"Fail to setup DMDana_ini module for folder %d"%self.folder_number)
             return
         try:
             self.DMDana_analysis()
-        except:
-            self.Find_Error_and_Save('DMDana analysis failed at folder %d'%self.folder_number)
+        except Exception as e:
+            self.Find_Error_and_Save(e,'DMDana analysis failed at folder %d'%self.folder_number)
             return
         self.Success_and_Save()
         return
@@ -87,7 +87,7 @@ class folder_analysis(object):
     def log_init(self):
         os.chdir(root_path)
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             filename='./%d/folder_%d.log'%(self.folder_number,self.folder_number),
             format='%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%m/%d/%Y %I:%M:%S %p',
@@ -105,9 +105,10 @@ class folder_analysis(object):
         self.DMDana_ini.DMDana_ini_configparser['occup-time']['t_max']=str(int(np.floor(np.min([self.DMDana_ini.get_folder_config('occup_time',0).occup_t_tot,2000]))))
         logging.info('Finish seting DMDana_module for this folder, fake log finished')
 
-    def Find_Error_and_Save(self, error):
+    def Find_Error_and_Save(self, exception,error_message):
         os.chdir(root_path)
-        logging.info(error)
+        logging.error(error_message)
+        logging.exception(exception)
         self.df_one_folder.loc[self.folder_number,'organize_status']='Fail'
         save_database('./%d/database_out_%d.xlsx'%(self.folder_number,self.folder_number),self.df_one_folder)
         return
